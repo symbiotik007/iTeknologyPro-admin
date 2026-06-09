@@ -1,0 +1,34 @@
+import { clsx, type ClassValue } from "clsx";
+import type { OrderStatus } from "./types";
+
+export const cn = (...inputs: ClassValue[]) => clsx(inputs);
+
+export const formatCOP = (amount: number) =>
+  new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(amount);
+
+export const formatDate = (iso: string) =>
+  new Date(iso).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" });
+
+export const timeAgo = (iso: string) => {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1)  return "ahora";
+  if (mins < 60) return `hace ${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)  return `hace ${hrs} h`;
+  return formatDate(iso);
+};
+
+export const STATUS_META: Record<OrderStatus, { label: string; color: string; next?: OrderStatus }> = {
+  "pendiente":       { label: "Pendiente",       color: "amber",  next: "en preparación" },
+  "en preparación":  { label: "En preparación",  color: "blue",   next: "listo"          },
+  "listo":           { label: "Listo",            color: "green",  next: "entregado"      },
+  "entregado":       { label: "Entregado",        color: "slate"                          },
+};
+
+export const PAYMENT_LABELS: Record<string, string> = {
+  efectivo:      "Efectivo",
+  nequi:         "Nequi",
+  daviplata:     "Daviplata",
+  transferencia: "Transferencia",
+};
