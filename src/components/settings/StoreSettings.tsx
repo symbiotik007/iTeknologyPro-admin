@@ -200,21 +200,37 @@ function TeamTab({ storeId, isOwner, currentRole }: { storeId: string; isOwner: 
   };
 
   const changeRole = async (userId: string, newRole: string) => {
-    await fetch(`/api/staff/${userId}`, {
+    const prevRole = members.find(m => m.userId === userId)?.role;
+    setError(null);
+    setMembers(prev => prev.map(m => m.userId === userId ? { ...m, role: newRole } : m));
+    const res = await fetch(`/api/staff/${userId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ storeId, role: newRole }),
     });
-    setMembers(prev => prev.map(m => m.userId === userId ? { ...m, role: newRole } : m));
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error ?? "No se pudo cambiar el rol");
+      setMembers(prev => prev.map(m => m.userId === userId ? { ...m, role: prevRole ?? m.role } : m));
+    }
   };
 
   const remove = async (member: Member) => {
     if (!confirm(`¿Remover a ${member.email} del equipo?`)) return;
     setRemoving(member.userId);
-    await fetch(`/api/staff/${member.userId}?storeId=${storeId}`, { method: "DELETE" });
-    setMembers(prev => prev.filter(m => m.userId !== member.userId));
+    setError(null);
+    const res = await fetch(`/api/staff/${member.userId}?storeId=${storeId}`, { method: "DELETE" });
+    if (res.ok) {
+      setMembers(prev => prev.filter(m => m.userId !== member.userId));
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error ?? "No se pudo remover al miembro");
+    }
     setRemoving(null);
   };
+
+  // Cuántos dueños quedan — para proteger al último
+  const ownerCount = members.filter(m => m.role === "owner").length;
 
   return (
     <div className="space-y-4">
@@ -321,7 +337,11 @@ function TeamTab({ storeId, isOwner, currentRole }: { storeId: string; isOwner: 
           <div className="px-6 py-10 text-center text-gray-400 text-sm">Sin miembros todavía</div>
         ) : (
           <div className="divide-y divide-gray-50">
-            {members.map(member => (
+            {members.map(member => {
+              // El último dueño no se puede degradar ni eliminar (quedarías sin acceso)
+              const isLastOwner = member.role === "owner" && ownerCount <= 1;
+              const canManage   = isOwner && !isLastOwner;
+              return (
               <div key={member.userId} className="px-6 py-4 flex items-center gap-4">
                 {/* Avatar */}
                 <div className="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center flex-shrink-0">
@@ -339,7 +359,7 @@ function TeamTab({ storeId, isOwner, currentRole }: { storeId: string; isOwner: 
                 </div>
 
                 {/* Role selector o badge */}
-                {isOwner && member.role !== "owner" ? (
+                {canManage ? (
                   <div className="relative flex-shrink-0">
                     <select
                       value={member.role}
@@ -353,11 +373,14 @@ function TeamTab({ storeId, isOwner, currentRole }: { storeId: string; isOwner: 
                     <ChevronDown className="w-3 h-3 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
                 ) : (
-                  <RoleBadge role={member.role} />
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <RoleBadge role={member.role} />
+                    {isLastOwner && <span className="text-[10px] text-gray-400">único dueño</span>}
+                  </div>
                 )}
 
                 {/* Remove */}
-                {isOwner && member.role !== "owner" && (
+                {canManage && (
                   <button
                     onClick={() => remove(member)}
                     disabled={removing === member.userId}
@@ -369,7 +392,8 @@ function TeamTab({ storeId, isOwner, currentRole }: { storeId: string; isOwner: 
                   </button>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

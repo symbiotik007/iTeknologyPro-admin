@@ -15,6 +15,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { userId: st
     }
 
     const supabase = createServiceClient();
+
+    // Protección: no degradar al último dueño de la tienda
+    if (role !== "owner" && await isLastOwner(supabase, storeId, params.userId)) {
+      return NextResponse.json({ error: "No puedes degradar al último dueño de la tienda" }, { status: 400 });
+    }
+
     const { error } = await supabase
       .from("store_users")
       .update({ role })
@@ -34,6 +40,12 @@ export async function DELETE(req: NextRequest, { params }: { params: { userId: s
   if (!storeId) return NextResponse.json({ error: "storeId requerido" }, { status: 400 });
 
   const supabase = createServiceClient();
+
+  // Protección: no eliminar al último dueño de la tienda
+  if (await isLastOwner(supabase, storeId, params.userId)) {
+    return NextResponse.json({ error: "No puedes eliminar al último dueño de la tienda" }, { status: 400 });
+  }
+
   const { error } = await supabase
     .from("store_users")
     .delete()
@@ -42,4 +54,28 @@ export async function DELETE(req: NextRequest, { params }: { params: { userId: s
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
+}
+
+// ¿Este usuario es el único dueño que le queda a la tienda?
+async function isLastOwner(
+  supabase: ReturnType<typeof createServiceClient>,
+  storeId: string,
+  userId: string,
+): Promise<boolean> {
+  const { data: target } = await supabase
+    .from("store_users")
+    .select("role")
+    .eq("store_id", storeId)
+    .eq("user_id", userId)
+    .single();
+
+  if (target?.role !== "owner") return false;
+
+  const { count } = await supabase
+    .from("store_users")
+    .select("user_id", { count: "exact", head: true })
+    .eq("store_id", storeId)
+    .eq("role", "owner");
+
+  return (count ?? 0) <= 1;
 }
