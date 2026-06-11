@@ -60,13 +60,15 @@ export async function POST(req: NextRequest) {
           email,
           password,
           email_confirm: true,
+          // El trigger handle_new_user inserta en public.customers y exige store_id
+          user_metadata: { store_id: storeId, name: email.split("@")[0] },
         });
         if (createErr) throw createErr;
         userId = created.user?.id;
       } else {
         // Invitar — Supabase envía email de invitación
         const { data: invited, error: inviteErr } = await supabase.auth.admin.inviteUserByEmail(email, {
-          data: { invited_to: storeId },
+          data: { invited_to: storeId, store_id: storeId, name: email.split("@")[0] },
         });
         if (inviteErr) throw inviteErr;
         userId = invited.user?.id;
@@ -87,7 +89,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Este usuario ya es parte del equipo" }, { status: 409 });
     }
 
-    await supabase.from("store_users").insert({ store_id: storeId, user_id: userId, role });
+    const { error: insertErr } = await supabase
+      .from("store_users")
+      .insert({ store_id: storeId, user_id: userId, role });
+    if (insertErr) throw insertErr;
 
     return NextResponse.json({ success: true, userId, mode });
   } catch (err: any) {
