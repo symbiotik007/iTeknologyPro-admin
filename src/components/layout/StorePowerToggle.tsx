@@ -1,19 +1,20 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Power, Loader2 } from "lucide-react";
+import { Power, Loader2, ExternalLink } from "lucide-react";
 
 // Interruptor maestro de la tienda: apaga/enciende la recepción de pedidos.
 // Vive en el sidebar para que sea visible desde cualquier página del admin.
 export default function StorePowerToggle({ storeId }: { storeId: string }) {
-  const [paused, setPaused]   = useState<boolean | null>(null); // null = cargando
-  const [saving, setSaving]   = useState(false);
+  const [paused, setPaused]     = useState<boolean | null>(null); // null = cargando
+  const [saving, setSaving]     = useState(false);
+  const [storeUrl, setStoreUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     setPaused(null);
     fetch(`/api/stores/${storeId}/power`)
       .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (active && d) setPaused(d.paused); })
+      .then(d => { if (active && d) { setPaused(d.paused); setStoreUrl(d.storeUrl ?? null); } })
       .catch(() => {});
     return () => { active = false; };
   }, [storeId]);
@@ -46,6 +47,7 @@ export default function StorePowerToggle({ storeId }: { storeId: string }) {
   }
 
   return (
+    <>
     <button
       onClick={toggle}
       disabled={saving}
@@ -75,5 +77,19 @@ export default function StorePowerToggle({ storeId }: { storeId: string }) {
         </span>
       </span>
     </button>
+
+    {/* Link directo a la tienda pública (se configura en Configuración → Información) */}
+    {storeUrl && (
+      <a
+        href={storeUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-2 flex items-center justify-center gap-2 w-full rounded-lg border border-gray-800 bg-gray-900 px-3 py-2 text-xs font-semibold text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
+      >
+        <ExternalLink className="w-3.5 h-3.5" />
+        Ver mi tienda
+      </a>
+    )}
+    </>
   );
 }

@@ -59,6 +59,7 @@ function ProductsTab({ storeId, initialProducts, initialCategories }: Props) {
   const [editing, setEditing]   = useState<Partial<Product> | null>(null);
   const [saving, setSaving]     = useState(false);
   const [tab, setTab]           = useState<string>("all");
+  const [deleting, setDeleting] = useState<number | null>(null);
 
   const displayed = tab === "all" ? products : products.filter(p => p.cat === tab);
 
@@ -69,6 +70,19 @@ function ProductsTab({ storeId, initialProducts, initialCategories }: Props) {
       body:    JSON.stringify({ active: !product.active }),
     });
     if (res.ok) setProducts(prev => prev.map(p => p.id === product.id ? { ...p, active: !p.active } : p));
+  };
+
+  const removeProduct = async (product: Product) => {
+    if (!confirm(`¿Eliminar "${product.title}"? Esta acción no se puede deshacer.`)) return;
+    setDeleting(product.id);
+    const res = await fetch(`/api/products/${product.id}`, { method: "DELETE" });
+    if (res.ok) {
+      setProducts(prev => prev.filter(p => p.id !== product.id));
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error ?? "No se pudo eliminar el producto");
+    }
+    setDeleting(null);
   };
 
   const saveProduct = async () => {
@@ -131,7 +145,44 @@ function ProductsTab({ storeId, initialProducts, initialCategories }: Props) {
           </button>
         </div>
 
-        <table className="w-full">
+        {/* Lista en tarjetas (móvil) */}
+        <div className="md:hidden divide-y divide-gray-50">
+          {displayed.map(p => (
+            <div key={p.id} className={`px-4 py-3.5 flex items-center gap-3 ${!p.active ? "opacity-50" : ""}`}>
+              {p.img ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={p.img} alt={p.title} className="w-12 h-12 rounded-lg object-cover bg-gray-100 flex-shrink-0" />
+              ) : (
+                <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                  <UtensilsCrossed className="w-5 h-5 text-gray-300" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm text-gray-800 truncate">{p.title}</p>
+                <p className="text-xs text-gray-400 capitalize">{p.cat} · <span className="font-semibold text-gray-600">{formatCOP(p.price)}</span></p>
+              </div>
+              <button onClick={() => toggleActive(p)} aria-label={p.active ? "Desactivar" : "Activar"} className="p-1.5">
+                {p.active
+                  ? <ToggleRight className="w-6 h-6 text-green-500" />
+                  : <ToggleLeft  className="w-6 h-6 text-gray-400" />}
+              </button>
+              <button onClick={() => setEditing(p)} aria-label="Editar" className="p-2 text-gray-400 active:text-gray-700">
+                <Pencil className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => removeProduct(p)}
+                disabled={deleting === p.id}
+                aria-label="Eliminar"
+                className="p-2 text-gray-400 active:text-red-500"
+              >
+                {deleting === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Tabla (desktop) */}
+        <table className="w-full hidden md:table">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
               {["Producto", "Categoría", "Precio", "Estado", ""].map(h => (
@@ -164,9 +215,23 @@ function ProductsTab({ storeId, initialProducts, initialCategories }: Props) {
                   </button>
                 </td>
                 <td className="px-6 py-3.5">
-                  <button onClick={() => setEditing(p)} className="text-gray-400 hover:text-gray-700">
-                    <Pencil className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setEditing(p)}
+                      title="Editar"
+                      className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => removeProduct(p)}
+                      disabled={deleting === p.id}
+                      title="Eliminar"
+                      className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      {deleting === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -180,8 +245,8 @@ function ProductsTab({ storeId, initialProducts, initialCategories }: Props) {
 
       {/* Product modal */}
       {editing && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90dvh] overflow-y-auto">
             <div className="px-6 py-5 border-b border-gray-100">
               <h3 className="font-bold text-gray-900">{editing.id ? "Editar producto" : "Nuevo producto"}</h3>
             </div>
@@ -373,8 +438,8 @@ function CategoriesTab({ storeId, initialCategories }: { storeId: string; initia
 
       {/* Category modal */}
       {editing && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90dvh] overflow-y-auto">
             <div className="px-6 py-5 border-b border-gray-100">
               <h3 className="font-bold text-gray-900">{editing.id ? "Editar categoría" : "Nueva categoría"}</h3>
             </div>

@@ -21,7 +21,7 @@ export default async function BranchesPage() {
     .order("sort_order");
 
   return (
-    <div className="p-6 max-w-3xl">
+    <div className="p-4 sm:p-6 max-w-3xl">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Sucursales</h1>
         <p className="text-sm text-gray-500 mt-1">Sedes de <span className="font-semibold">{activeStoreId}</span></p>

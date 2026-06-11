@@ -24,8 +24,8 @@ export default async function OrdersPage() {
     .limit(100);
 
   return (
-    <div className="flex flex-col h-screen">
-      <div className="px-6 py-5 border-b border-gray-200 bg-white">
+    <div className="flex flex-col h-[calc(100dvh-3.5rem)] md:h-screen">
+      <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-gray-200 bg-white">
         <h1 className="text-xl font-bold text-gray-900">Pedidos</h1>
         <p className="text-sm text-gray-500 mt-0.5">Los nuevos pedidos aparecen en tiempo real</p>
       </div>

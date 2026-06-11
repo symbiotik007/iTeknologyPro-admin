@@ -201,8 +201,8 @@ export default function BranchManager({
 
       {/* Modal */}
       {editing && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90dvh] overflow-y-auto">
             <div className="px-6 py-5 border-b border-gray-100">
               <h3 className="font-bold text-gray-900">
                 {editing.id ? "Editar sede" : "Nueva sede"}

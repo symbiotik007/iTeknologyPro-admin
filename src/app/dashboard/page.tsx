@@ -38,7 +38,7 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <div className="p-6 max-w-5xl">
+    <div className="p-4 sm:p-6 max-w-5xl">
       {/* Header */}
       <div className="mb-6 flex items-start justify-between">
         <div>
@@ -52,7 +52,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
         {stats.map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
             <div className={`inline-flex p-2.5 rounded-xl ${bg} mb-3`}>
@@ -90,21 +90,24 @@ export default async function DashboardPage() {
             Sin pedidos todavía. Cuando llegue el primero aparecerá aquí.
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
                 {["ID", "Cliente", "Total", "Estado"].map(h => (
-                  <th key={h} className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
+                  <th key={h} className="text-left px-4 sm:px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {(recent as Order[]).map(o => (
                 <tr key={o.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-3.5 font-mono text-sm font-semibold text-gray-700">{o.id}</td>
-                  <td className="px-6 py-3.5 text-sm text-gray-700">{o.customer?.name}</td>
-                  <td className="px-6 py-3.5 text-sm font-semibold text-gray-800">{formatCOP(o.total)}</td>
-                  <td className="px-6 py-3.5">
+                  <td className="px-4 sm:px-6 py-3.5 font-mono text-sm font-semibold text-gray-700 whitespace-nowrap" title={o.id}>
+                    {o.id.length > 12 ? `${o.id.slice(0, 8)}…` : o.id}
+                  </td>
+                  <td className="px-4 sm:px-6 py-3.5 text-sm text-gray-700">{o.customer?.name}</td>
+                  <td className="px-4 sm:px-6 py-3.5 text-sm font-semibold text-gray-800 whitespace-nowrap">{formatCOP(o.total)}</td>
+                  <td className="px-4 sm:px-6 py-3.5">
                     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
                       o.status === "pendiente"       ? "bg-amber-100 text-amber-700" :
                       o.status === "en preparación"  ? "bg-blue-100 text-blue-700"  :
@@ -118,6 +121,7 @@ export default async function DashboardPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

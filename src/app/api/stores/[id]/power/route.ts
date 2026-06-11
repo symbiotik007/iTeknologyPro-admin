@@ -12,7 +12,10 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     .from("stores").select("config").eq("id", params.id).single();
 
   if (error || !data) return NextResponse.json({ error: "Store no encontrado" }, { status: 404 });
-  return NextResponse.json({ paused: data.config?.paused === true });
+  return NextResponse.json({
+    paused:   data.config?.paused === true,
+    storeUrl: data.config?.storeUrl ?? null,
+  });
 }
 
 // PATCH /api/stores/:id/power — { paused: boolean } apaga/enciende la tienda

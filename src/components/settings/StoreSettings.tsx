@@ -63,17 +63,20 @@ export default function StoreSettings({ store, storeId, userRole }: Props) {
 // ─── Info Tab ─────────────────────────────────────────────────────────────────
 
 function InfoTab({ store, storeId, canEdit }: { store: Store | null; storeId: string; canEdit: boolean }) {
-  const cfg = (store?.config ?? {}) as { contact?: { nequi?: string } };
-  const [name, setName]     = useState(store?.name ?? "");
-  const [nequi, setNequi]   = useState(cfg.contact?.nequi ?? "");
+  const cfg = (store?.config ?? {}) as { contact?: { nequi?: string }; storeUrl?: string };
+  const [name, setName]         = useState(store?.name ?? "");
+  const [nequi, setNequi]       = useState(cfg.contact?.nequi ?? "");
+  const [storeUrl, setStoreUrl] = useState(cfg.storeUrl ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved]   = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const save = async () => {
     setSaving(true);
     const base = (store?.config ?? {}) as Record<string, unknown>;
     const config = {
       ...base,
+      storeUrl: storeUrl.trim(),
       contact: { ...((base.contact as Record<string, unknown>) ?? {}), nequi: nequi.trim() },
     };
     await fetch(`/api/stores/${storeId}`, {
@@ -86,8 +89,62 @@ function InfoTab({ store, storeId, canEdit }: { store: Store | null; storeId: st
     setTimeout(() => setSaved(false), 3000);
   };
 
+  const copyUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(storeUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard bloqueado: el usuario puede copiar manualmente */ }
+  };
+
+  const shareWhatsApp = () => {
+    const text = `¡Haz tu pedido en ${name || "nuestra tienda"}! 🛍️ ${storeUrl}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+  };
+
   return (
     <div className="space-y-4">
+      {/* Tu tienda en línea — link para compartir */}
+      <div className="bg-gradient-to-br from-brand-500 to-brand-600 rounded-2xl shadow-sm p-6 text-white">
+        <h2 className="font-bold text-lg mb-1">🛍️ Tu tienda en línea</h2>
+        {storeUrl ? (
+          <>
+            <p className="text-sm text-white/80 mb-4">Comparte este link con tus clientes para recibir pedidos.</p>
+            <div className="bg-white/15 rounded-xl px-4 py-3 font-mono text-sm break-all mb-4 select-all">
+              {storeUrl}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={copyUrl}
+                className="flex items-center gap-2 bg-white text-brand-600 hover:bg-white/90 text-sm font-bold px-4 py-2.5 rounded-lg transition-colors"
+              >
+                {copied ? "✓ ¡Copiado!" : "📋 Copiar link"}
+              </button>
+              <a
+                href={storeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 bg-white/15 hover:bg-white/25 text-white text-sm font-bold px-4 py-2.5 rounded-lg transition-colors"
+              >
+                Abrir tienda ↗
+              </a>
+              <button
+                onClick={shareWhatsApp}
+                className="flex items-center gap-2 bg-white/15 hover:bg-white/25 text-white text-sm font-bold px-4 py-2.5 rounded-lg transition-colors"
+              >
+                💬 Compartir por WhatsApp
+              </button>
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-white/80">
+            {canEdit
+              ? "Configura la URL de tu tienda en el campo de abajo y guárdala para poder compartirla desde aquí."
+              : "El dueño aún no ha configurado la URL pública de la tienda."}
+          </p>
+        )}
+      </div>
+
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <h2 className="font-semibold text-gray-900 mb-5">Información del negocio</h2>
         <div className="space-y-4">
@@ -105,6 +162,18 @@ function InfoTab({ store, storeId, canEdit }: { store: Store | null; storeId: st
             <input value={storeId} disabled
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-gray-50 text-gray-400 font-mono" />
             <p className="text-xs text-gray-400 mt-1">Identificador único del negocio — no puede cambiarse</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1.5">URL pública de la tienda</label>
+            <input
+              value={storeUrl}
+              onChange={e => setStoreUrl(e.target.value)}
+              disabled={!canEdit}
+              placeholder="https://www.tutienda.com"
+              inputMode="url"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-400"
+            />
+            <p className="text-xs text-gray-400 mt-1">El link que compartes con tus clientes — aparece en la tarjeta de arriba.</p>
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1.5">Número Nequi (para recibir pagos)</label>
@@ -293,7 +362,7 @@ function TeamTab({ storeId, isOwner, currentRole }: { storeId: string; isOwner: 
 
           <div className="space-y-3">
             {/* Email */}
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <input
                 type="email"
                 name="new-member-email"
@@ -303,11 +372,11 @@ function TeamTab({ storeId, isOwner, currentRole }: { storeId: string; isOwner: 
                 placeholder="correo@ejemplo.com"
                 className="flex-1 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
-              <div className="relative">
+              <div className="relative sm:w-auto">
                 <select
                   value={role}
                   onChange={e => setRole(e.target.value)}
-                  className="h-full border border-gray-200 rounded-lg pl-3 pr-8 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none bg-white"
+                  className="w-full sm:w-auto h-full border border-gray-200 rounded-lg px-3 py-2.5 sm:py-0 pr-8 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none bg-white"
                 >
                   <option value="cajero">Cajero</option>
                   <option value="admin">Gerente</option>
@@ -374,7 +443,7 @@ function TeamTab({ storeId, isOwner, currentRole }: { storeId: string; isOwner: 
               const isLastOwner = member.role === "owner" && ownerCount <= 1;
               const canManage   = isOwner && !isLastOwner;
               return (
-              <div key={member.userId} className="px-6 py-4 flex items-center gap-4">
+              <div key={member.userId} className="px-4 sm:px-6 py-4 flex flex-wrap items-center gap-3 sm:gap-4">
                 {/* Avatar */}
                 <div className="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center flex-shrink-0">
                   <span className="text-sm font-bold text-brand-600">
@@ -383,7 +452,7 @@ function TeamTab({ storeId, isOwner, currentRole }: { storeId: string; isOwner: 
                 </div>
 
                 {/* Info */}
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 basis-40">
                   <p className="text-sm font-medium text-gray-900 truncate">{member.email}</p>
                   <p className="text-xs text-gray-400 mt-0.5">
                     Desde {new Date(member.createdAt).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })}
@@ -484,7 +553,7 @@ function CustomersTab({ storeId }: { storeId: string }) {
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-4">
+      <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
           <h2 className="font-semibold text-gray-900">Clientes registrados</h2>
           <p className="text-xs text-gray-400 mt-0.5">{customers.length} cliente{customers.length !== 1 ? "s" : ""}</p>
@@ -494,7 +563,7 @@ function CustomersTab({ storeId }: { storeId: string }) {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Buscar por nombre, email o teléfono..."
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 w-64"
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 w-full sm:w-64"
         />
       </div>
 

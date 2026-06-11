@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import type { Order, OrderStatus } from "@/lib/types";
 import { formatCOP, timeAgo, STATUS_META, PAYMENT_LABELS } from "@/lib/utils";
 import StatusBadge from "./StatusBadge";
-import { ChevronRight, MapPin, Phone, ShoppingBag, Bike, Store, RefreshCw } from "lucide-react";
+import { ChevronRight, MapPin, Phone, ShoppingBag, Bike, Store, RefreshCw, X } from "lucide-react";
 
 const POLL_INTERVAL = 10_000; // 10 segundos
 
@@ -118,7 +118,7 @@ export default function OrdersBoard({ storeId, initialOrders = [] }: { storeId: 
       {/* Lista */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Filtros + indicador */}
-        <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center gap-2 flex-wrap">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 bg-white flex items-center gap-2 flex-wrap">
           <div className="flex gap-2 flex-wrap flex-1">
           {(["todos", "pendiente", "en preparación", "listo", "entregado"] as const).map(f => (
             <button
@@ -163,7 +163,39 @@ export default function OrdersBoard({ storeId, initialOrders = [] }: { storeId: 
               <p className="text-sm">Los pedidos nuevos aparecerán aquí en tiempo real</p>
             </div>
           ) : (
-            <table className="w-full">
+            <>
+            {/* Lista en tarjetas (móvil) */}
+            <div className="md:hidden divide-y divide-gray-100">
+              {filtered.map(order => (
+                <button
+                  key={order.id}
+                  onClick={() => setSelected(order)}
+                  className={`w-full text-left px-4 py-3.5 flex items-center gap-3 transition-colors active:bg-gray-50 ${
+                    order.status === "pendiente" ? "border-l-4 border-l-amber-400" : ""
+                  }`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-gray-800 text-sm truncate">{order.customer?.name || "Cliente"}</p>
+                      <span className="text-xs text-gray-400 flex-shrink-0">{timeAgo(order.created_at)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="flex items-center gap-1 text-xs text-gray-500">
+                        {order.delivery === "domicilio"
+                          ? <><Bike className="w-3 h-3" /> Domicilio</>
+                          : <><Store className="w-3 h-3" /> Recoger</>}
+                      </span>
+                      <span className="text-sm font-bold text-gray-800">{formatCOP(order.total)}</span>
+                    </div>
+                    <div className="mt-1.5"><StatusBadge status={order.status} /></div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                </button>
+              ))}
+            </div>
+
+            {/* Tabla (desktop) */}
+            <table className="w-full hidden md:table">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Pedido</th>
@@ -205,19 +237,29 @@ export default function OrdersBoard({ storeId, initialOrders = [] }: { storeId: 
                 ))}
               </tbody>
             </table>
+            </>
           )}
         </div>
       </div>
 
-      {/* Panel lateral de detalle */}
+      {/* Panel de detalle: pantalla completa en móvil, lateral en desktop */}
       {selected && (
-        <div className="w-96 border-l border-gray-200 bg-white overflow-auto flex-shrink-0">
-          <div className="p-6 border-b border-gray-100 flex items-start justify-between">
-            <div>
-              <p className="font-mono text-sm font-bold text-gray-800">{selected.id}</p>
+        <div className="fixed inset-0 top-14 z-40 md:static md:z-auto md:top-auto w-full md:w-96 border-l border-gray-200 bg-white overflow-auto flex-shrink-0">
+          <div className="p-4 sm:p-6 border-b border-gray-100 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-mono text-sm font-bold text-gray-800 break-all">{selected.id}</p>
               <p className="text-xs text-gray-400 mt-0.5">{timeAgo(selected.created_at)}</p>
             </div>
-            <StatusBadge status={selected.status} />
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <StatusBadge status={selected.status} />
+              <button
+                onClick={() => setSelected(null)}
+                aria-label="Cerrar detalle"
+                className="p-2 -mr-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Cliente */}
