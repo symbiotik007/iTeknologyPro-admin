@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import type { Store } from "@/lib/types";
-import { Loader2, Save, UserPlus, Trash2, Shield, ChevronDown, Building2, Users, ShoppingBag } from "lucide-react";
+import { Loader2, Save, UserPlus, Trash2, Shield, ChevronDown, Building2, Users, ShoppingBag, Check, X } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -164,6 +164,10 @@ function TeamTab({ storeId, isOwner, currentRole }: { storeId: string; isOwner: 
   const [error, setError]       = useState<string | null>(null);
   const [success, setSuccess]   = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
+  // Cambios de rol pendientes de guardar: userId -> nuevo rol
+  const [pendingRoles, setPendingRoles] = useState<Record<string, string>>({});
+  const [savingRole, setSavingRole]     = useState<string | null>(null);
+  const [savedRole, setSavedRole]       = useState<string | null>(null);
 
   const fetchMembers = async () => {
     setLoading(true);
@@ -199,20 +203,44 @@ function TeamTab({ storeId, isOwner, currentRole }: { storeId: string; isOwner: 
     }
   };
 
-  const changeRole = async (userId: string, newRole: string) => {
-    const prevRole = members.find(m => m.userId === userId)?.role;
-    setError(null);
-    setMembers(prev => prev.map(m => m.userId === userId ? { ...m, role: newRole } : m));
+  const selectRole = (userId: string, newRole: string) => {
+    setError(null); setSavedRole(null);
+    setPendingRoles(prev => {
+      const current = members.find(m => m.userId === userId)?.role;
+      if (newRole === current) {
+        const { [userId]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [userId]: newRole };
+    });
+  };
+
+  const cancelRole = (userId: string) => {
+    setPendingRoles(prev => {
+      const { [userId]: _, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  const saveRole = async (userId: string) => {
+    const newRole = pendingRoles[userId];
+    if (!newRole) return;
+    setSavingRole(userId); setError(null); setSavedRole(null);
     const res = await fetch(`/api/staff/${userId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ storeId, role: newRole }),
     });
-    if (!res.ok) {
+    if (res.ok) {
+      setMembers(prev => prev.map(m => m.userId === userId ? { ...m, role: newRole } : m));
+      cancelRole(userId);
+      setSavedRole(userId);
+      setTimeout(() => setSavedRole(prev => (prev === userId ? null : prev)), 2500);
+    } else {
       const data = await res.json().catch(() => ({}));
       setError(data.error ?? "No se pudo cambiar el rol");
-      setMembers(prev => prev.map(m => m.userId === userId ? { ...m, role: prevRole ?? m.role } : m));
     }
+    setSavingRole(null);
   };
 
   const remove = async (member: Member) => {
@@ -360,17 +388,46 @@ function TeamTab({ storeId, isOwner, currentRole }: { storeId: string; isOwner: 
 
                 {/* Role selector o badge */}
                 {canManage ? (
-                  <div className="relative flex-shrink-0">
-                    <select
-                      value={member.role}
-                      onChange={e => changeRole(member.userId, e.target.value)}
-                      className="border border-gray-200 rounded-lg pl-2.5 pr-7 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none bg-white"
-                    >
-                      <option value="cajero">Cajero</option>
-                      <option value="admin">Gerente</option>
-                      <option value="owner">Dueño</option>
-                    </select>
-                    <ChevronDown className="w-3 h-3 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {savedRole === member.userId && (
+                      <span className="text-xs text-green-600 font-medium">✓ Guardado</span>
+                    )}
+                    <div className="relative">
+                      <select
+                        value={pendingRoles[member.userId] ?? member.role}
+                        onChange={e => selectRole(member.userId, e.target.value)}
+                        disabled={savingRole === member.userId}
+                        className={`border rounded-lg pl-2.5 pr-7 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500 appearance-none bg-white ${pendingRoles[member.userId] ? "border-brand-400" : "border-gray-200"}`}
+                      >
+                        <option value="cajero">Cajero</option>
+                        <option value="admin">Gerente</option>
+                        <option value="owner">Dueño</option>
+                      </select>
+                      <ChevronDown className="w-3 h-3 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                    {pendingRoles[member.userId] && (
+                      <>
+                        <button
+                          onClick={() => saveRole(member.userId)}
+                          disabled={savingRole === member.userId}
+                          title="Guardar cambio de rol"
+                          className="flex items-center gap-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors"
+                        >
+                          {savingRole === member.userId
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <Check className="w-3.5 h-3.5" />}
+                          Guardar
+                        </button>
+                        <button
+                          onClick={() => cancelRole(member.userId)}
+                          disabled={savingRole === member.userId}
+                          title="Descartar cambio"
+                          className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 flex-shrink-0">
