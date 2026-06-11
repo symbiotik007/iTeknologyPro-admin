@@ -28,7 +28,7 @@ export const STATUS_META: Record<OrderStatus, { label: string; color: string; ne
 
 export const PAYMENT_LABELS: Record<string, string> = {
   efectivo:      "Efectivo",
-  nequi:         "Nequi",
-  daviplata:     "Daviplata",
+  nequi:         "Nequi / Daviplata",
+  daviplata:     "Daviplata", // pedidos antiguos, antes de fusionarse con Nequi
   transferencia: "Transferencia",
 };

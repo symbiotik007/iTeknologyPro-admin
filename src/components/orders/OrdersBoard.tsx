@@ -270,10 +270,10 @@ export default function OrdersBoard({ storeId, initialOrders = [] }: { storeId: 
             <p><span className="font-medium">Pago:</span> {PAYMENT_LABELS[selected.payment] ?? selected.payment}</p>
           </div>
 
-          {/* Comprobante Nequi */}
-          {selected.payment === "nequi" && (
+          {/* Comprobante de pago (Nequi/Daviplata o transferencia) */}
+          {(selected.payment === "nequi" || selected.payment === "transferencia") && (
             <div className="p-6 border-b border-gray-100">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Comprobante Nequi</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Comprobante de pago</p>
               {selected.payment_proof?.url ? (
                 <>
                   {selected.payment_proof.reference && (

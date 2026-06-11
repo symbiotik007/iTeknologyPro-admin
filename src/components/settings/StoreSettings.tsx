@@ -296,6 +296,8 @@ function TeamTab({ storeId, isOwner, currentRole }: { storeId: string; isOwner: 
             <div className="flex gap-3">
               <input
                 type="email"
+                name="new-member-email"
+                autoComplete="off"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="correo@ejemplo.com"
@@ -320,6 +322,8 @@ function TeamTab({ storeId, isOwner, currentRole }: { storeId: string; isOwner: 
               <div className="relative">
                 <input
                   type={showPass ? "text" : "password"}
+                  name="new-member-password"
+                  autoComplete="new-password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="Contraseña (mín. 6 caracteres)"

@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, ClipboardList, UtensilsCrossed, Settings, LogOut, Flame, ChevronDown, MapPin } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { switchStore } from "@/app/actions";
+import StorePowerToggle from "./StorePowerToggle";
 import { cn } from "@/lib/utils";
 import type { StoreEntry } from "@/lib/store-context";
 
@@ -61,6 +62,9 @@ export default function Sidebar({ stores, activeStoreId }: Props) {
             </div>
           </form>
         )}
+
+        {/* Interruptor maestro: apagar/encender la tienda */}
+        {active && <StorePowerToggle storeId={active.id} />}
       </div>
 
       {/* Nav */}
