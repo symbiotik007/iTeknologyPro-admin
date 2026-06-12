@@ -62,11 +62,27 @@ export default function StoreSettings({ store, storeId, userRole }: Props) {
 
 // ─── Info Tab ─────────────────────────────────────────────────────────────────
 
+// Acepta URL completa de reel/post o el código pelado, y devuelve el shortcode
+const parseReelCode = (line: string): string | null => {
+  const t = line.trim();
+  if (!t) return null;
+  const m = t.match(/(?:reels?|p)\/([A-Za-z0-9_-]+)/);
+  if (m) return m[1];
+  return /^[A-Za-z0-9_-]{5,}$/.test(t) ? t : null;
+};
+
 function InfoTab({ store, storeId, canEdit }: { store: Store | null; storeId: string; canEdit: boolean }) {
-  const cfg = (store?.config ?? {}) as { contact?: { nequi?: string }; storeUrl?: string };
+  const cfg = (store?.config ?? {}) as {
+    contact?: { nequi?: string };
+    storeUrl?: string;
+    instagram?: { reels?: string[] };
+  };
   const [name, setName]         = useState(store?.name ?? "");
   const [nequi, setNequi]       = useState(cfg.contact?.nequi ?? "");
   const [storeUrl, setStoreUrl] = useState(cfg.storeUrl ?? "");
+  const [reelsText, setReelsText] = useState(
+    (cfg.instagram?.reels ?? []).map(c => `https://www.instagram.com/reel/${c}/`).join("\n")
+  );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved]   = useState(false);
   const [copied, setCopied] = useState(false);
@@ -74,10 +90,15 @@ function InfoTab({ store, storeId, canEdit }: { store: Store | null; storeId: st
   const save = async () => {
     setSaving(true);
     const base = (store?.config ?? {}) as Record<string, unknown>;
+    const reels = reelsText
+      .split("\n")
+      .map(parseReelCode)
+      .filter((c): c is string => c !== null);
     const config = {
       ...base,
       storeUrl: storeUrl.trim(),
       contact: { ...((base.contact as Record<string, unknown>) ?? {}), nequi: nequi.trim() },
+      instagram: { ...((base.instagram as Record<string, unknown>) ?? {}), reels },
     };
     await fetch(`/api/stores/${storeId}`, {
       method:  "PATCH",
@@ -174,6 +195,21 @@ function InfoTab({ store, storeId, canEdit }: { store: Store | null; storeId: st
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-400"
             />
             <p className="text-xs text-gray-400 mt-1">El link que compartes con tus clientes — aparece en la tarjeta de arriba.</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1.5">Reels de Instagram (carrusel de la tienda)</label>
+            <textarea
+              value={reelsText}
+              onChange={e => setReelsText(e.target.value)}
+              disabled={!canEdit}
+              rows={6}
+              placeholder={"https://www.instagram.com/reel/ABC123.../\nhttps://www.instagram.com/reel/XYZ789.../"}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-400 resize-y"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Un reel por línea (pega el link tal cual desde Instagram → Compartir → Copiar enlace).
+              El primero de la lista aparece de primero en el carrusel. Al guardar, la tienda se actualiza sin necesidad de deploy.
+            </p>
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1.5">Número Nequi (para recibir pagos)</label>
