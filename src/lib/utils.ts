@@ -22,8 +22,16 @@ export const timeAgo = (iso: string) => {
 export const STATUS_META: Record<OrderStatus, { label: string; color: string; next?: OrderStatus }> = {
   "pendiente":       { label: "Pendiente",       color: "amber",  next: "en preparación" },
   "en preparación":  { label: "En preparación",  color: "blue",   next: "listo"          },
-  "listo":           { label: "Listo",            color: "green",  next: "entregado"      },
+  "listo":           { label: "Preparado",        color: "green",  next: "en camino"      },
+  "en camino":       { label: "En camino",        color: "purple", next: "entregado"      },
   "entregado":       { label: "Entregado",        color: "slate"                          },
+};
+
+// El paso "en camino" solo aplica a domicilios; al recoger en tienda,
+// de "Preparado" se pasa directo a "Entregado".
+export const nextStatusFor = (order: { status: OrderStatus; delivery?: string }): OrderStatus | undefined => {
+  if (order.status === "listo" && order.delivery !== "domicilio") return "entregado";
+  return STATUS_META[order.status]?.next;
 };
 
 export const PAYMENT_LABELS: Record<string, string> = {

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { Order, OrderStatus } from "@/lib/types";
-import { formatCOP, timeAgo, STATUS_META, PAYMENT_LABELS } from "@/lib/utils";
+import { formatCOP, timeAgo, STATUS_META, PAYMENT_LABELS, nextStatusFor } from "@/lib/utils";
 import StatusBadge from "./StatusBadge";
 import { ChevronRight, MapPin, Phone, ShoppingBag, Bike, Store, RefreshCw, X } from "lucide-react";
 
@@ -66,7 +66,7 @@ export default function OrdersBoard({ storeId, initialOrders = [] }: { storeId: 
   }, []);
 
   const advance = async (order: Order) => {
-    const next = STATUS_META[order.status]?.next;
+    const next = nextStatusFor(order);
     if (!next) return;
     setUpdating(order.id);
     await fetch(`/api/orders/${order.id}`, {
@@ -110,6 +110,7 @@ export default function OrdersBoard({ storeId, initialOrders = [] }: { storeId: 
     pendiente:       orders.filter(o => o.status === "pendiente").length,
     "en preparación": orders.filter(o => o.status === "en preparación").length,
     listo:           orders.filter(o => o.status === "listo").length,
+    "en camino":     orders.filter(o => o.status === "en camino").length,
     entregado:       orders.filter(o => o.status === "entregado").length,
   };
 
@@ -120,7 +121,7 @@ export default function OrdersBoard({ storeId, initialOrders = [] }: { storeId: 
         {/* Filtros + indicador */}
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 bg-white flex items-center gap-2 flex-wrap">
           <div className="flex gap-2 flex-wrap flex-1">
-          {(["todos", "pendiente", "en preparación", "listo", "entregado"] as const).map(f => (
+          {(["todos", "pendiente", "en preparación", "listo", "en camino", "entregado"] as const).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -323,6 +324,11 @@ export default function OrdersBoard({ storeId, initialOrders = [] }: { storeId: 
                       Ref: <span className="font-mono">{selected.payment_proof.reference}</span>
                     </p>
                   )}
+                  {(selected.payment_proof.attempts ?? 1) > 1 && (
+                    <p className="text-xs text-amber-600 font-semibold mb-2">
+                      Comprobante reenviado — intento {selected.payment_proof.attempts} de 3
+                    </p>
+                  )}
 
                   {/* Estado de verificación */}
                   {selected.payment_proof.verified === true && (
@@ -369,7 +375,7 @@ export default function OrdersBoard({ storeId, initialOrders = [] }: { storeId: 
           )}
 
           {/* Acción */}
-          {STATUS_META[selected.status]?.next && (
+          {nextStatusFor(selected) && (
             <div className="p-6">
               <button
                 onClick={() => advance(selected)}
@@ -378,7 +384,7 @@ export default function OrdersBoard({ storeId, initialOrders = [] }: { storeId: 
               >
                 {updating === selected.id
                   ? "Actualizando..."
-                  : `Marcar como "${STATUS_META[STATUS_META[selected.status].next!].label}"`}
+                  : `Marcar como "${STATUS_META[nextStatusFor(selected)!].label}"`}
               </button>
             </div>
           )}

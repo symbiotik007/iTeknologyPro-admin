@@ -1,4 +1,4 @@
-export type OrderStatus = "pendiente" | "en preparación" | "listo" | "entregado";
+export type OrderStatus = "pendiente" | "en preparación" | "listo" | "en camino" | "entregado";
 export type DeliveryType = "domicilio" | "recoger";
 export type UserRole = "owner" | "admin" | "staff";
 
@@ -29,6 +29,7 @@ export interface PaymentProof {
   uploaded_at?: string;
   verified?: boolean;     // true = verificado, false = falso, undefined = sin revisar
   checked_at?: string;
+  attempts?: number;      // intentos de subida (máx. 3; al rechazar puede reintentar)
 }
 
 export interface Order {

@@ -38,7 +38,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     // Cambio de estado
     const { status } = body;
-    const VALID = ["pendiente", "en preparación", "listo", "entregado"];
+    const VALID = ["pendiente", "en preparación", "listo", "en camino", "entregado"];
     if (!VALID.includes(status)) {
       return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
     }
