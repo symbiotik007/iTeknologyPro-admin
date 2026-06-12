@@ -8,7 +8,7 @@ import { Loader2, Save, UserPlus, Trash2, Shield, ChevronDown, Building2, Users,
 type Props = { store: Store | null; storeId: string; userRole: string };
 
 type Member   = { userId: string; email: string; role: string; createdAt: string };
-type Customer = { userId: string; name: string; email: string; phone: string; createdAt: string };
+type Customer = { userId: string; name: string; email: string; phone: string; cedula: string; createdAt: string };
 
 // ─── Role config ─────────────────────────────────────────────────────────────
 
@@ -584,7 +584,8 @@ function CustomersTab({ storeId }: { storeId: string }) {
     !search ||
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     c.email.toLowerCase().includes(search.toLowerCase()) ||
-    c.phone.includes(search)
+    c.phone.includes(search) ||
+    (c.cedula ?? "").includes(search)
   );
 
   return (
@@ -598,7 +599,7 @@ function CustomersTab({ storeId }: { storeId: string }) {
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar por nombre, email o teléfono..."
+          placeholder="Buscar por nombre, email, teléfono o cédula..."
           className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 w-full sm:w-64"
         />
       </div>
@@ -632,9 +633,10 @@ function CustomersTab({ storeId }: { storeId: string }) {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-900">{c.name !== "—" ? c.name : c.email}</p>
-                <div className="flex items-center gap-3 mt-0.5">
+                <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                   <p className="text-xs text-gray-400">{c.email}</p>
                   {c.phone !== "—" && <p className="text-xs text-gray-400">· {c.phone}</p>}
+                  {c.cedula && c.cedula !== "—" && <p className="text-xs text-gray-400">· CC {c.cedula}</p>}
                 </div>
               </div>
               <p className="text-xs text-gray-400 flex-shrink-0">

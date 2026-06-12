@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { Order, OrderStatus } from "@/lib/types";
-import { formatCOP, timeAgo, STATUS_META, PAYMENT_LABELS, nextStatusFor } from "@/lib/utils";
+import { formatCOP, timeAgo, STATUS_META, PAYMENT_LABELS, nextStatusFor, prevStatusFor } from "@/lib/utils";
 import StatusBadge from "./StatusBadge";
 import { ChevronRight, MapPin, Phone, ShoppingBag, Bike, Store, RefreshCw, X } from "lucide-react";
 
@@ -65,18 +65,27 @@ export default function OrdersBoard({ storeId, initialOrders = [] }: { storeId: 
     if (Notification.permission === "default") Notification.requestPermission();
   }, []);
 
-  const advance = async (order: Order) => {
-    const next = nextStatusFor(order);
-    if (!next) return;
+  const setStatus = async (order: Order, status: OrderStatus) => {
     setUpdating(order.id);
     await fetch(`/api/orders/${order.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: next }),
+      body: JSON.stringify({ status }),
     });
-    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: next } : o));
-    setSelected(prev => prev?.id === order.id ? { ...prev, status: next } : prev);
+    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status } : o));
+    setSelected(prev => prev?.id === order.id ? { ...prev, status } : prev);
     setUpdating(null);
+  };
+
+  const advance = async (order: Order) => {
+    const next = nextStatusFor(order);
+    if (next) await setStatus(order, next);
+  };
+
+  // Corrige un avance hecho por error: devuelve el pedido un paso en el flujo
+  const goBack = async (order: Order) => {
+    const prev = prevStatusFor(order);
+    if (prev) await setStatus(order, prev);
   };
 
   // Abre el comprobante Nequi en una pestaña nueva (signed URL temporal)
@@ -374,18 +383,30 @@ export default function OrdersBoard({ storeId, initialOrders = [] }: { storeId: 
             </div>
           )}
 
-          {/* Acción */}
-          {nextStatusFor(selected) && (
-            <div className="p-6">
-              <button
-                onClick={() => advance(selected)}
-                disabled={updating === selected.id}
-                className="w-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white font-semibold py-3 rounded-xl transition-colors text-sm"
-              >
-                {updating === selected.id
-                  ? "Actualizando..."
-                  : `Marcar como "${STATUS_META[nextStatusFor(selected)!].label}"`}
-              </button>
+          {/* Acciones */}
+          {(nextStatusFor(selected) || prevStatusFor(selected)) && (
+            <div className="p-6 space-y-2">
+              {nextStatusFor(selected) && (
+                <button
+                  onClick={() => advance(selected)}
+                  disabled={updating === selected.id}
+                  className="w-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white font-semibold py-3 rounded-xl transition-colors text-sm"
+                >
+                  {updating === selected.id
+                    ? "Actualizando..."
+                    : `Marcar como "${STATUS_META[nextStatusFor(selected)!].label}"`}
+                </button>
+              )}
+              {prevStatusFor(selected) && (
+                <button
+                  onClick={() => goBack(selected)}
+                  disabled={updating === selected.id}
+                  title="Corrige el flujo si avanzaste por error"
+                  className="w-full border border-gray-200 hover:border-gray-400 disabled:opacity-60 text-gray-500 hover:text-gray-700 font-semibold py-2.5 rounded-xl transition-colors text-sm"
+                >
+                  ← Regresar a {'"'}{STATUS_META[prevStatusFor(selected)!].label}{'"'}
+                </button>
+              )}
             </div>
           )}
           {selected.status === "entregado" && (

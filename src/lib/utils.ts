@@ -34,6 +34,17 @@ export const nextStatusFor = (order: { status: OrderStatus; delivery?: string })
   return STATUS_META[order.status]?.next;
 };
 
+// Paso anterior del flujo — para corregir cuando la tienda avanzó por error
+export const prevStatusFor = (order: { status: OrderStatus; delivery?: string }): OrderStatus | undefined => {
+  switch (order.status) {
+    case "en preparación": return "pendiente";
+    case "listo":          return "en preparación";
+    case "en camino":      return "listo";
+    case "entregado":      return order.delivery === "domicilio" ? "en camino" : "listo";
+    default:               return undefined;
+  }
+};
+
 export const PAYMENT_LABELS: Record<string, string> = {
   efectivo:      "Efectivo",
   nequi:         "Nequi / Daviplata",

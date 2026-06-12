@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
 
   const { data: customers, error } = await supabase
     .from("customers")
-    .select("user_id, name, phone, created_at")
+    .select("user_id, name, phone, cedula, created_at")
     .eq("store_id", storeId)
     .order("created_at", { ascending: false });
 
@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
       userId:    c.user_id,
       name:      c.name ?? "—",
       phone:     c.phone ?? "—",
+      cedula:    c.cedula ?? "—",
       email:     u?.email ?? "—",
       createdAt: c.created_at,
     };
