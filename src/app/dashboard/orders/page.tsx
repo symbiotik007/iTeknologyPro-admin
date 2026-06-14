@@ -23,6 +23,11 @@ export default async function OrdersPage() {
     .order("created_at", { ascending: false })
     .limit(100);
 
+  // Tiempos estimados de entrega configurados en Configuración
+  const { data: store } = await admin
+    .from("stores").select("config").eq("id", activeStoreId).single();
+  const eta = (store?.config?.eta ?? { domicilio: 45, recoger: 20 }) as { domicilio?: number; recoger?: number };
+
   return (
     <div className="flex flex-col h-[calc(100dvh-3.5rem)] md:h-screen">
       <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-gray-200 bg-white">
@@ -30,7 +35,7 @@ export default async function OrdersPage() {
         <p className="text-sm text-gray-500 mt-0.5">Los nuevos pedidos aparecen en tiempo real</p>
       </div>
       <div className="flex-1 overflow-hidden">
-        <OrdersBoard storeId={activeStoreId} initialOrders={(orders ?? []) as Order[]} />
+        <OrdersBoard storeId={activeStoreId} initialOrders={(orders ?? []) as Order[]} eta={eta} />
       </div>
     </div>
   );

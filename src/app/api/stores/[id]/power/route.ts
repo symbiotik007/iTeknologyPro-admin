@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { computePaused, type Schedule } from "@/lib/schedule";
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204 });
@@ -12,9 +13,13 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     .from("stores").select("config").eq("id", params.id).single();
 
   if (error || !data) return NextResponse.json({ error: "Store no encontrado" }, { status: 404 });
+  const schedule = (data.config?.schedule ?? null) as Schedule | null;
   return NextResponse.json({
-    paused:   data.config?.paused === true,
-    storeUrl: data.config?.storeUrl ?? null,
+    paused:    computePaused(data.config),       // estado efectivo (switch + horario)
+    manual:    data.config?.paused === true,     // valor del switch manual
+    scheduled: schedule?.enabled === true,       // ¿controlado por horario automático?
+    schedule,
+    storeUrl:  data.config?.storeUrl ?? null,
   });
 }
 

@@ -3,17 +3,40 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import type { Order, OrderStatus } from "@/lib/types";
 import { formatCOP, timeAgo, STATUS_META, PAYMENT_LABELS, nextStatusFor, prevStatusFor } from "@/lib/utils";
 import StatusBadge from "./StatusBadge";
-import { ChevronRight, MapPin, Phone, ShoppingBag, Bike, Store, RefreshCw, X } from "lucide-react";
+import OrderChat from "./OrderChat";
+import { fetchUnreadCounts as fetchChatUnread } from "@/lib/orderChat";
+import { ChevronRight, MapPin, Phone, ShoppingBag, Bike, Store, RefreshCw, X, MessageCircle } from "lucide-react";
 
 const POLL_INTERVAL = 10_000; // 10 segundos
 
-export default function OrdersBoard({ storeId, initialOrders = [] }: { storeId: string; initialOrders?: Order[] }) {
+type EtaConfig = { domicilio?: number; recoger?: number };
+
+// Hora estimada de entrega + si va atrasado, según el tiempo configurado.
+// El reloj arranca cuando el pedido pasa a "en preparación" (preparing_at);
+// para pedidos viejos sin esa marca, cae a created_at.
+function etaForOrder(order: Order, eta?: EtaConfig) {
+  if (!eta) return null;
+  const mins = order.delivery === "domicilio" ? eta.domicilio : eta.recoger;
+  if (!mins) return null;
+  // Aún no inicia preparación → todavía no hay cuenta regresiva
+  if (order.status === "pendiente") return { waiting: true as const };
+  const start = order.preparing_at || order.created_at;
+  if (!start) return null;
+  const target = new Date(start).getTime() + mins * 60000;
+  const clock  = new Date(target).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit" });
+  const diff   = Math.round((target - Date.now()) / 60000);
+  const late   = order.status !== "entregado" && diff < -2;
+  return { waiting: false as const, clock, diff, late };
+}
+
+export default function OrdersBoard({ storeId, initialOrders = [], eta }: { storeId: string; initialOrders?: Order[]; eta?: EtaConfig }) {
   const [orders, setOrders]       = useState<Order[]>(initialOrders);
   const [selected, setSelected]   = useState<Order | null>(null);
   const [updating, setUpdating]   = useState<string | null>(null);
   const [filter, setFilter]       = useState<OrderStatus | "todos">("todos");
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [newBadge, setNewBadge]   = useState(false);
+  const [chatUnread, setChatUnread] = useState<Record<string, number>>({});
   const prevIdsRef                = useRef<Set<string>>(new Set(initialOrders.map(o => o.id)));
 
   const load = useCallback(async () => {
@@ -51,6 +74,7 @@ export default function OrdersBoard({ storeId, initialOrders = [] }: { storeId: 
     prevIdsRef.current = new Set(data.map(o => o.id));
     setOrders(data);
     setLastUpdate(new Date());
+    fetchChatUnread(storeId).then(setChatUnread);
   }, [storeId]);
 
   // Carga inicial + polling cada 10s
@@ -187,7 +211,12 @@ export default function OrdersBoard({ storeId, initialOrders = [] }: { storeId: 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-semibold text-gray-800 text-sm truncate">{order.customer?.name || "Cliente"}</p>
-                      <span className="text-xs text-gray-400 flex-shrink-0">{timeAgo(order.created_at)}</span>
+                      {chatUnread[order.id] > 0 && (
+                        <span className="flex items-center gap-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0">
+                          <MessageCircle className="w-3 h-3" />{chatUnread[order.id]}
+                        </span>
+                      )}
+                      <span className="text-xs text-gray-400 flex-shrink-0 ml-auto">{timeAgo(order.created_at)}</span>
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="flex items-center gap-1 text-xs text-gray-500">
@@ -229,7 +258,16 @@ export default function OrdersBoard({ storeId, initialOrders = [] }: { storeId: 
                     <td className="px-6 py-3.5">
                       <span className="font-mono text-sm font-semibold text-gray-800">{order.id}</span>
                     </td>
-                    <td className="px-4 py-3.5 text-sm text-gray-700">{order.customer?.name}</td>
+                    <td className="px-4 py-3.5 text-sm text-gray-700">
+                      <span className="flex items-center gap-2">
+                        {order.customer?.name}
+                        {chatUnread[order.id] > 0 && (
+                          <span className="flex items-center gap-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                            <MessageCircle className="w-3 h-3" />{chatUnread[order.id]}
+                          </span>
+                        )}
+                      </span>
+                    </td>
                     <td className="px-4 py-3.5">
                       <span className="flex items-center gap-1.5 text-sm text-gray-600">
                         {order.delivery === "domicilio"
@@ -318,8 +356,38 @@ export default function OrdersBoard({ storeId, initialOrders = [] }: { storeId: 
           {/* Info entrega */}
           <div className="p-6 border-b border-gray-100 text-sm space-y-1.5 text-gray-600">
             <p><span className="font-medium">Entrega:</span> {selected.delivery === "domicilio" ? "🛵 A domicilio" : "🏠 Recoger en tienda"}</p>
+            {(() => {
+              const e = etaForOrder(selected, eta);
+              if (!e) return null;
+              if (e.waiting) return (
+                <p className="text-gray-400">
+                  <span className="font-medium text-gray-500">Entrega estimada:</span> al iniciar preparación
+                </p>
+              );
+              return (
+                <p className={e.late ? "text-red-700 font-semibold" : ""}>
+                  <span className="font-medium">{selected.delivery === "domicilio" ? "Entrega estimada:" : "Listo estimado:"}</span>{" "}
+                  {e.clock}
+                  {selected.status !== "entregado" && (e.late
+                    ? ` · ⚠️ atrasado ~${-e.diff} min`
+                    : e.diff >= 0 ? ` · faltan ~${e.diff} min` : "")}
+                </p>
+              );
+            })()}
             {selected.branch && <p><span className="font-medium">Sede:</span> {selected.branch.name}</p>}
             <p><span className="font-medium">Pago:</span> {PAYMENT_LABELS[selected.payment] ?? selected.payment}</p>
+            {selected.payment === "efectivo" && selected.customer?.cash && (
+              selected.customer.cash.needsChange ? (
+                <p className="flex items-center gap-2 text-sm font-semibold text-amber-800 bg-amber-50 rounded-lg px-3 py-2">
+                  💵 Paga con {formatCOP(selected.customer.cash.payWith ?? 0)} — llevar vuelto{" "}
+                  <span className="text-amber-900">{formatCOP(selected.customer.cash.change ?? 0)}</span>
+                </p>
+              ) : (
+                <p className="flex items-center gap-2 text-sm font-medium text-green-700 bg-green-50 rounded-lg px-3 py-2">
+                  ✅ Paga con monto exacto — no necesita vuelto
+                </p>
+              )
+            )}
           </div>
 
           {/* Comprobante de pago (Nequi/Daviplata o transferencia) */}
@@ -412,6 +480,19 @@ export default function OrdersBoard({ storeId, initialOrders = [] }: { storeId: 
           {selected.status === "entregado" && (
             <div className="px-6 pb-6 text-center text-sm text-gray-400">✅ Pedido completado</div>
           )}
+
+          {/* Chat con el cliente */}
+          <div className="p-6 border-t border-gray-100">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <MessageCircle className="w-3.5 h-3.5" /> Chat con el cliente
+            </p>
+            <OrderChat
+              key={selected.id}
+              storeId={storeId}
+              orderId={selected.id}
+              onRead={(id) => setChatUnread(u => (u[id] ? { ...u, [id]: 0 } : u))}
+            />
+          </div>
         </div>
       )}
     </div>

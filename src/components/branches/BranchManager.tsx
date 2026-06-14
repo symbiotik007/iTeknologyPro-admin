@@ -2,6 +2,18 @@
 import { useState } from "react";
 import { Plus, Pencil, ToggleLeft, ToggleRight, Trash2, Loader2, MapPin, Phone, Navigation } from "lucide-react";
 import AddressPicker from "@/components/shared/AddressPicker";
+import dynamic from "next/dynamic";
+import type { Coverage } from "./CoverageMap";
+
+// El mapa (mapbox-gl) se carga solo al abrir el modal de edición → ruta liviana
+const CoverageMap = dynamic(() => import("./CoverageMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-64 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-center text-sm text-gray-400">
+      Cargando mapa…
+    </div>
+  ),
+});
 
 export interface Branch {
   id: string;
@@ -13,6 +25,9 @@ export interface Branch {
   active: boolean;
   sort_order: number;
   created_at: string;
+  lat?: number | null;
+  lng?: number | null;
+  coverage?: Coverage | null;
 }
 
 type BranchForm = {
@@ -21,9 +36,12 @@ type BranchForm = {
   phone: string;
   reference: string;
   active: boolean;
+  lat: number | null;
+  lng: number | null;
+  coverage: Coverage | null;
 };
 
-const EMPTY: BranchForm = { name: "", address: "", phone: "", reference: "", active: true };
+const EMPTY: BranchForm = { name: "", address: "", phone: "", reference: "", active: true, lat: null, lng: null, coverage: null };
 
 export default function BranchManager({
   storeId,
@@ -41,7 +59,10 @@ export default function BranchManager({
   const openNew  = () => { setError(null); setEditing({ ...EMPTY }); };
   const openEdit = (b: Branch) => {
     setError(null);
-    setEditing({ id: b.id, name: b.name, address: b.address, phone: b.phone ?? "", reference: b.reference ?? "", active: b.active });
+    setEditing({
+      id: b.id, name: b.name, address: b.address, phone: b.phone ?? "", reference: b.reference ?? "", active: b.active,
+      lat: b.lat ?? null, lng: b.lng ?? null, coverage: b.coverage ?? null,
+    });
   };
 
   const save = async () => {
@@ -51,10 +72,27 @@ export default function BranchManager({
     try {
       const isEdit = !!editing.id;
       const url    = isEdit ? `/api/branches/${editing.id}` : "/api/branches";
+      // Solo guardamos cobertura VÁLIDA (radio km>0 o polígono >=3 puntos);
+      // si no, va null → la tienda no valida y deja pasar (no bloquea de más).
+      const cov = editing.coverage;
+      const validCoverage =
+        cov?.type === "radius"  && cov.km > 0 ? cov :
+        cov?.type === "polygon" && cov.coordinates.length >= 3 ? cov : null;
+      const payload = {
+        store_id:  storeId,
+        name:      editing.name,
+        address:   editing.address,
+        phone:     editing.phone,
+        reference: editing.reference,
+        active:    editing.active,
+        lat:       editing.lat,
+        lng:       editing.lng,
+        coverage:  validCoverage,
+      };
       const res    = await fetch(url, {
         method:  isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ ...editing, store_id: storeId }),
+        body:    JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Error al guardar");
@@ -153,6 +191,13 @@ export default function BranchManager({
                     <Navigation className="w-3 h-3 flex-shrink-0" />
                     {branch.address}
                   </p>
+                  {branch.coverage && branch.lat != null && (
+                    <p className="text-xs text-green-600 font-medium mt-0.5 pl-4">
+                      📍 Cobertura a domicilio: {branch.coverage.type === "radius"
+                        ? `radio ${branch.coverage.km} km`
+                        : `zona dibujada (${branch.coverage.coordinates.length} puntos)`}
+                    </p>
+                  )}
                   {branch.reference && (
                     <p className="text-xs text-gray-400 mt-0.5 pl-4">{branch.reference}</p>
                   )}
@@ -261,6 +306,19 @@ export default function BranchManager({
                   placeholder="+57 300 000 0000"
                   type="tel"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-1">
+                  Zona de cobertura a domicilio
+                </label>
+                <CoverageMap
+                  lat={editing.lat}
+                  lng={editing.lng}
+                  coverage={editing.coverage}
+                  address={editing.address}
+                  onChange={(v) => setEditing(p => ({ ...p!, lat: v.lat, lng: v.lng, coverage: v.coverage }))}
                 />
               </div>
 

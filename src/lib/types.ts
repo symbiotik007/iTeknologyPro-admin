@@ -9,11 +9,19 @@ export interface OrderItem {
   price: number;
 }
 
+// Detalle del vuelto cuando el pago es en efectivo (lo decide el cliente al pedir)
+export interface OrderCash {
+  needsChange: boolean;  // true = necesita vuelto, false = paga exacto
+  payWith?: number;      // con cuánto paga (solo si needsChange)
+  change?: number;       // vuelto a devolver (solo si needsChange)
+}
+
 export interface OrderCustomer {
   name: string;
   phone: string;
   address?: string;
   notes?: string;
+  cash?: OrderCash;
 }
 
 export interface OrderBranch {
@@ -47,6 +55,7 @@ export interface Order {
   payment_proof?: PaymentProof | null;
   created_at: string;
   updated_at: string;
+  preparing_at?: string | null;  // instante en que pasó a "en preparación"
 }
 
 export interface Product {

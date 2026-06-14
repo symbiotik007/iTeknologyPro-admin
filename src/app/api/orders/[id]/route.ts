@@ -43,8 +43,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
     }
 
+    const patch: Record<string, unknown> = { status };
+
+    // El reloj de entrega arranca aquí: marca el inicio de preparación una sola
+    // vez (si ya tenía marca, se respeta para no reiniciar la cuenta regresiva).
+    if (status === "en preparación") {
+      const { data: cur } = await supabase
+        .from("orders").select("preparing_at").eq("id", params.id).single();
+      if (!cur?.preparing_at) patch.preparing_at = new Date().toISOString();
+    }
+
     const { data, error } = await supabase
-      .from("orders").update({ status }).eq("id", params.id).select().single();
+      .from("orders").update(patch).eq("id", params.id).select().single();
 
     if (error) throw error;
     return NextResponse.json(data);

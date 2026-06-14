@@ -1,7 +1,19 @@
 "use client";
 import { useState, useEffect } from "react";
 import type { Store } from "@/lib/types";
-import { Loader2, Save, UserPlus, Trash2, Shield, ChevronDown, Building2, Users, ShoppingBag, Check, X } from "lucide-react";
+import type { Schedule } from "@/lib/schedule";
+import { Loader2, Save, UserPlus, Trash2, Shield, ChevronDown, Building2, Users, ShoppingBag, Check, X, Clock } from "lucide-react";
+
+// Días de la semana para el horario automático (0=Dom .. 6=Sáb, orden Lun→Dom)
+const WEEKDAYS: { value: number; label: string }[] = [
+  { value: 1, label: "Lun" },
+  { value: 2, label: "Mar" },
+  { value: 3, label: "Mié" },
+  { value: 4, label: "Jue" },
+  { value: 5, label: "Vie" },
+  { value: 6, label: "Sáb" },
+  { value: 0, label: "Dom" },
+];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,12 +88,26 @@ function InfoTab({ store, storeId, canEdit }: { store: Store | null; storeId: st
     contact?: { nequi?: string };
     storeUrl?: string;
     instagram?: { reels?: string[] };
+    schedule?: Schedule;
+    announcements?: string[];
+    eta?: { domicilio?: number; recoger?: number };
   };
   const [name, setName]         = useState(store?.name ?? "");
   const [nequi, setNequi]       = useState(cfg.contact?.nequi ?? "");
   const [storeUrl, setStoreUrl] = useState(cfg.storeUrl ?? "");
+  const [announceText, setAnnounceText] = useState((cfg.announcements ?? []).join("\n"));
+  // Tiempos estimados de entrega (minutos)
+  const [etaDomicilio, setEtaDomicilio] = useState(String(cfg.eta?.domicilio ?? 45));
+  const [etaRecoger, setEtaRecoger]     = useState(String(cfg.eta?.recoger ?? 20));
   const [reelsText, setReelsText] = useState(
     (cfg.instagram?.reels ?? []).map(c => `https://www.instagram.com/reel/${c}/`).join("\n")
+  );
+  // Horario automático de encendido/apagado
+  const [schedEnabled, setSchedEnabled] = useState(cfg.schedule?.enabled ?? false);
+  const [schedOpen, setSchedOpen]       = useState(cfg.schedule?.open ?? "08:00");
+  const [schedClose, setSchedClose]     = useState(cfg.schedule?.close ?? "22:00");
+  const [schedDays, setSchedDays]       = useState<number[]>(
+    cfg.schedule?.days && cfg.schedule.days.length ? cfg.schedule.days : [0, 1, 2, 3, 4, 5, 6]
   );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved]   = useState(false);
@@ -94,11 +120,30 @@ function InfoTab({ store, storeId, canEdit }: { store: Store | null; storeId: st
       .split("\n")
       .map(parseReelCode)
       .filter((c): c is string => c !== null);
+    const schedule: Schedule = {
+      ...((base.schedule as Schedule) ?? {}),
+      enabled: schedEnabled,
+      tz: "America/Bogota",
+      open: schedOpen,
+      close: schedClose,
+      days: [...schedDays].sort((a, b) => a - b),
+    };
+    const announcements = announceText
+      .split("\n")
+      .map(l => l.trim())
+      .filter(Boolean);
+    const eta = {
+      domicilio: Math.max(0, parseInt(etaDomicilio, 10) || 0),
+      recoger:   Math.max(0, parseInt(etaRecoger, 10) || 0),
+    };
     const config = {
       ...base,
       storeUrl: storeUrl.trim(),
       contact: { ...((base.contact as Record<string, unknown>) ?? {}), nequi: nequi.trim() },
       instagram: { ...((base.instagram as Record<string, unknown>) ?? {}), reels },
+      schedule,
+      announcements,
+      eta,
     };
     await fetch(`/api/stores/${storeId}`, {
       method:  "PATCH",
@@ -108,6 +153,10 @@ function InfoTab({ store, storeId, canEdit }: { store: Store | null; storeId: st
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
+  };
+
+  const toggleDay = (d: number) => {
+    setSchedDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
   };
 
   const copyUrl = async () => {
@@ -212,6 +261,21 @@ function InfoTab({ store, storeId, canEdit }: { store: Store | null; storeId: st
             </p>
           </div>
           <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1.5">Cartelito de anuncios (cinta superior)</label>
+            <textarea
+              value={announceText}
+              onChange={e => setAnnounceText(e.target.value)}
+              disabled={!canEdit}
+              rows={4}
+              placeholder={"🔥 Envío gratis por compras > $80.000\n🎁 Usa el código BIENVENIDO10 y ahorra 10%\n📲 Pedidos al 300 123 4567"}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-400 resize-y"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Un anuncio por línea — desfilan en la cinta que se desplaza arriba de la tienda (promos, códigos de descuento, avisos, etc.).
+              Puedes usar emojis. Déjalo vacío para mostrar solo el horario. Se actualiza sin necesidad de deploy.
+            </p>
+          </div>
+          <div>
             <label className="text-sm font-medium text-gray-700 block mb-1.5">Número Nequi (para recibir pagos)</label>
             <input
               value={nequi}
@@ -224,6 +288,160 @@ function InfoTab({ store, storeId, canEdit }: { store: Store | null; storeId: st
             <p className="text-xs text-gray-400 mt-1">Los clientes verán este número al pagar por Nequi en la tienda.</p>
           </div>
         </div>
+
+        {canEdit && (
+          <div className="mt-5 flex items-center gap-3">
+            <button onClick={save} disabled={saving}
+              className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {saving ? "Guardando..." : "Guardar cambios"}
+            </button>
+            {saved && <span className="text-sm text-green-600 font-medium">✓ Guardado</span>}
+          </div>
+        )}
+      </div>
+
+      {/* Horario de encendido y apagado automático */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="flex items-start gap-3 mb-1">
+          <div className="w-9 h-9 rounded-xl bg-brand-100 flex items-center justify-center flex-shrink-0">
+            <Clock className="w-5 h-5 text-brand-600" />
+          </div>
+          <div className="flex-1">
+            <h2 className="font-semibold text-gray-900">Horario automático de la tienda</h2>
+            <p className="text-sm text-gray-400 mt-0.5">
+              La tienda se enciende y apaga sola a las horas que configures, sin tener que usar el interruptor.
+            </p>
+          </div>
+        </div>
+
+        {/* Interruptor de activación */}
+        <label className={`mt-4 flex items-center justify-between gap-3 rounded-xl border p-4 ${canEdit ? "cursor-pointer" : ""} ${schedEnabled ? "border-brand-200 bg-brand-50" : "border-gray-200 bg-gray-50"}`}>
+          <div>
+            <span className="block text-sm font-semibold text-gray-900">Activar horario automático</span>
+            <span className="block text-xs text-gray-400 mt-0.5">
+              {schedEnabled
+                ? "Mientras esté activo, el horario manda sobre el interruptor manual."
+                : "Desactivado: la tienda se controla solo con el interruptor manual."}
+            </span>
+          </div>
+          <input
+            type="checkbox"
+            checked={schedEnabled}
+            onChange={e => setSchedEnabled(e.target.checked)}
+            disabled={!canEdit}
+            className="h-5 w-5 rounded border-gray-300 text-brand-600 focus:ring-brand-500 flex-shrink-0"
+          />
+        </label>
+
+        {/* Horas y días */}
+        <div className={`mt-4 space-y-4 transition-opacity ${schedEnabled ? "" : "opacity-50 pointer-events-none"}`}>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1.5">Hora de encendido</label>
+              <input
+                type="time"
+                value={schedOpen}
+                onChange={e => setSchedOpen(e.target.value)}
+                disabled={!canEdit || !schedEnabled}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-400"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1.5">Hora de apagado</label>
+              <input
+                type="time"
+                value={schedClose}
+                onChange={e => setSchedClose(e.target.value)}
+                disabled={!canEdit || !schedEnabled}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-400"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-2">Días que aplica</label>
+            <div className="flex flex-wrap gap-2">
+              {WEEKDAYS.map(d => {
+                const on = schedDays.includes(d.value);
+                return (
+                  <button
+                    key={d.value}
+                    type="button"
+                    onClick={() => canEdit && schedEnabled && toggleDay(d.value)}
+                    disabled={!canEdit || !schedEnabled}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                      on ? "bg-brand-500 border-brand-500 text-white" : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
+                    }`}
+                  >
+                    {d.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <p className="text-xs text-gray-400">
+            {schedClose <= schedOpen
+              ? `La tienda abre a las ${schedOpen} y cierra a las ${schedClose} del día siguiente (horario nocturno).`
+              : `La tienda estará abierta de ${schedOpen} a ${schedClose}.`}
+            {" "}Hora de Colombia. Recuerda guardar los cambios abajo.
+          </p>
+        </div>
+
+        {canEdit && (
+          <div className="mt-5 flex items-center gap-3">
+            <button onClick={save} disabled={saving}
+              className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {saving ? "Guardando..." : "Guardar cambios"}
+            </button>
+            {saved && <span className="text-sm text-green-600 font-medium">✓ Guardado</span>}
+          </div>
+        )}
+      </div>
+
+      {/* Tiempos estimados de entrega */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="flex items-start gap-3 mb-1">
+          <div className="w-9 h-9 rounded-xl bg-brand-100 flex items-center justify-center flex-shrink-0">
+            <Clock className="w-5 h-5 text-brand-600" />
+          </div>
+          <div className="flex-1">
+            <h2 className="font-semibold text-gray-900">Tiempos estimados de entrega</h2>
+            <p className="text-sm text-gray-400 mt-0.5">
+              El cliente verá en cada pedido una cuenta regresiva (cuánto falta, si ya llega o va atrasado), contada desde que entra la orden.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1.5">🛵 A domicilio (minutos)</label>
+            <input
+              type="number"
+              min={0}
+              value={etaDomicilio}
+              onChange={e => setEtaDomicilio(e.target.value)}
+              disabled={!canEdit}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-400"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1.5">🏠 Recoger en tienda (minutos)</label>
+            <input
+              type="number"
+              min={0}
+              value={etaRecoger}
+              onChange={e => setEtaRecoger(e.target.value)}
+              disabled={!canEdit}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-50 disabled:text-gray-400"
+            />
+          </div>
+        </div>
+        <p className="text-xs text-gray-400 mt-2">
+          Ejemplo: 45 min a domicilio significa que un pedido hecho a las 7:00 mostrará entrega estimada ~7:45. Recuerda guardar los cambios abajo.
+        </p>
 
         {canEdit && (
           <div className="mt-5 flex items-center gap-3">

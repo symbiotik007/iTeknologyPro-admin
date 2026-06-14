@@ -1,26 +1,39 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Power, Loader2, ExternalLink } from "lucide-react";
+import { Power, Loader2, ExternalLink, Clock } from "lucide-react";
 
 // Interruptor maestro de la tienda: apaga/enciende la recepción de pedidos.
 // Vive en el sidebar para que sea visible desde cualquier página del admin.
+// Si hay horario automático activo, el estado lo manda el horario y el switch
+// manual queda informativo (se configura en Configuración → Información).
 export default function StorePowerToggle({ storeId }: { storeId: string }) {
-  const [paused, setPaused]     = useState<boolean | null>(null); // null = cargando
-  const [saving, setSaving]     = useState(false);
-  const [storeUrl, setStoreUrl] = useState<string | null>(null);
+  const [paused, setPaused]       = useState<boolean | null>(null); // null = cargando
+  const [scheduled, setScheduled] = useState(false);                // controlado por horario
+  const [saving, setSaving]       = useState(false);
+  const [storeUrl, setStoreUrl]   = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     setPaused(null);
-    fetch(`/api/stores/${storeId}/power`)
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (active && d) { setPaused(d.paused); setStoreUrl(d.storeUrl ?? null); } })
-      .catch(() => {});
-    return () => { active = false; };
+    const load = () =>
+      fetch(`/api/stores/${storeId}/power`)
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => {
+          if (active && d) {
+            setPaused(d.paused);
+            setScheduled(d.scheduled === true);
+            setStoreUrl(d.storeUrl ?? null);
+          }
+        })
+        .catch(() => {});
+    load();
+    // Si el horario manda, el estado cambia solo al cruzar la hora: refrescamos cada minuto.
+    const id = setInterval(load, 60_000);
+    return () => { active = false; clearInterval(id); };
   }, [storeId]);
 
   const toggle = async () => {
-    if (paused === null || saving) return;
+    if (paused === null || saving || scheduled) return;
     const next = !paused;
     const msg = next
       ? "¿Apagar la tienda? Los clientes NO podrán hacer pedidos hasta que la enciendas de nuevo."
@@ -50,11 +63,16 @@ export default function StorePowerToggle({ storeId }: { storeId: string }) {
     <>
     <button
       onClick={toggle}
-      disabled={saving}
+      disabled={saving || scheduled}
       className={
-        paused
-          ? "mt-3 w-full rounded-xl border-2 border-red-500 bg-red-500/15 px-3 py-3 text-left transition-colors hover:bg-red-500/25 animate-pulse"
-          : "mt-3 w-full rounded-xl border-2 border-green-500 bg-green-500/10 px-3 py-3 text-left transition-colors hover:bg-green-500/20"
+        (paused
+          ? "mt-3 w-full rounded-xl border-2 border-red-500 bg-red-500/15 px-3 py-3 text-left transition-colors"
+          : "mt-3 w-full rounded-xl border-2 border-green-500 bg-green-500/10 px-3 py-3 text-left transition-colors") +
+        (scheduled
+          ? " cursor-default"
+          : paused
+            ? " hover:bg-red-500/25 animate-pulse"
+            : " hover:bg-green-500/20")
       }
     >
       <span className="flex items-center gap-2.5">
@@ -72,11 +90,22 @@ export default function StorePowerToggle({ storeId }: { storeId: string }) {
             {paused ? "Tienda apagada" : "Tienda abierta"}
           </span>
           <span className="block text-[11px] text-gray-400 leading-tight">
-            {paused ? "No recibe pedidos — toca para encender" : "Recibiendo pedidos — toca para apagar"}
+            {scheduled
+              ? (paused ? "Cerrada por horario automático" : "Abierta por horario automático")
+              : paused
+                ? "No recibe pedidos — toca para encender"
+                : "Recibiendo pedidos — toca para apagar"}
           </span>
         </span>
       </span>
     </button>
+
+    {scheduled && (
+      <span className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-gray-500">
+        <Clock className="w-3 h-3" />
+        Controlada por horario — cámbialo en Configuración
+      </span>
+    )}
 
     {/* Link directo a la tienda pública (se configura en Configuración → Información) */}
     {storeUrl && (

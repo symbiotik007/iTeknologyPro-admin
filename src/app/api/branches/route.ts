@@ -38,6 +38,9 @@ export async function POST(req: NextRequest) {
         reference:  body.reference ?? null,
         active:     body.active  ?? true,
         sort_order: body.sort_order ?? 0,
+        lat:        body.lat ?? null,
+        lng:        body.lng ?? null,
+        coverage:   body.coverage ?? null,
       })
       .select()
       .single();
