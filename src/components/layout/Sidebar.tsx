@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, ClipboardList, UtensilsCrossed, Settings, LogOut, Flame, ChevronDown, MapPin, Menu, X } from "lucide-react";
+import { LayoutDashboard, ClipboardList, UtensilsCrossed, Settings, LogOut, Flame, ChevronDown, MapPin, Menu, X, Wand2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { switchStore } from "@/app/actions";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,7 @@ const NAV = [
   { href: "/dashboard/orders",     icon: ClipboardList,    label: "Pedidos"     },
   { href: "/dashboard/menu",       icon: UtensilsCrossed,  label: "Menú"        },
   { href: "/dashboard/branches",   icon: MapPin,           label: "Sucursales"  },
+  { href: "/dashboard/store-maker", icon: Wand2,           label: "Store Maker" },
   { href: "/dashboard/settings",   icon: Settings,         label: "Configuración" },
 ];
 
